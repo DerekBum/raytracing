@@ -8,12 +8,13 @@
 #include "bvh.h"
 
 typedef std::minstd_rand rng_type;
+const float PI = acos(-1);
 
 class Uniform {
 public:
     Uniform() = default;
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n);
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
 
     float pdf(Point x, Point n, Point d) const;
 };
@@ -23,7 +24,7 @@ class Cosine {
 public:
     Cosine() {}
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n);
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
 
     float pdf(Point x, Point n, Point d) const;
 };
@@ -45,7 +46,7 @@ public:
         wz = sx * sy;
     }
 
-    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n);
+    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const;
 };
 
 class TriangleLight {
@@ -63,7 +64,7 @@ public:
         pointProb = 1.0 / (0.5 * sqrt(n.len_square()));
     }
 
-    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n);
+    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const;
 };
 
 class EllipsoidLight {
@@ -74,7 +75,7 @@ public:
 
     EllipsoidLight(const Figure &ellipsoid): figure(ellipsoid) {}
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n);
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
 };
 
 class FiguresMix {
@@ -103,7 +104,7 @@ public:
     }
 
     Point sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng,
-                 Point x, Point n);
+                 Point x, Point n) const;
 
     float pdf(Point x, Point n, Point d) const;
 
@@ -123,7 +124,7 @@ public:
     Mix(const std::vector<std::variant<Cosine, FiguresMix>> &components): components(components) {}
 
     Point sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng,
-                 Point x, Point n);
+                 Point x, Point n) const;
 
     float pdf(Point x, Point n, Point d) const;
 };

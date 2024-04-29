@@ -11,6 +11,7 @@ public:
     Color operator* (const Color &c) const;
     Color operator/ (const Color &c) const;
     Color operator+ (float k) const;
+    Color operator+ (const Color &c) const;
 
     Color() = default;
 };
@@ -18,6 +19,28 @@ public:
 Color gamma(const Color &x);
 Color aces(const Color &x);
 
-Color operator* (float k, const Color &p);
+Color operator* (float k, const Color &c);
+
+inline Color::Color(float red, float green, float blue): r(red), g(green), b(blue) {}
+
+inline Color Color::operator* (const Color &c) const {
+    return {r * c.r, g * c.g, b * c.b};
+}
+
+inline Color Color::operator/ (const Color &c) const {
+    return {r / c.r, g / c.g, b / c.b};
+}
+
+inline Color operator* (float k, const Color &c) {
+    return {k * c.r, k * c.g, k * c.b};
+}
+
+inline Color Color::operator+ (float k) const {
+    return {k + r, k + g, k + b};
+}
+
+inline Color Color::operator+(const Color &c) const {
+    return {r + c.r, g + c.g, b + c.b};
+}
 
 #endif //HW1_COLOR_H

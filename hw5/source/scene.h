@@ -27,7 +27,7 @@ public:
     void render(std::ostream &out) const;
     Color getPixelColor(std::uniform_real_distribution<float> u01, std::normal_distribution<float> n01, rng_type &rng, Ray ray, int bounceNum) const;
 
-    Mix* distribution;
+    Mix distribution;
 
     BVH bvh;
     int bvhble;

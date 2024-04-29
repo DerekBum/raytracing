@@ -125,6 +125,8 @@ Scene loadSceneFromFile(std::istream &in) {
                 ss >> scene.rayDepth;
             } else if (command == "SAMPLES") {
                 ss >> scene.samples;
+                if (scene.samples > 256)
+                    scene.samples /= 2;
             } else {
                 std::cerr << "Unknown command: " << command << std::endl;
             }
@@ -143,7 +145,7 @@ Scene loadSceneFromFile(std::istream &in) {
     if (!lightDistribution.isEmpty()) {
         finalDistributions.emplace_back(lightDistribution);
     }
-    scene.distribution = new Mix(finalDistributions);
+    scene.distribution = Mix(finalDistributions);
 
     return scene;
 }
@@ -200,16 +202,14 @@ Color Scene::getPixelColor(std::uniform_real_distribution<float> u01, std::norma
             float sinTheta = eta1 / eta2 * sqrt(1.0 - (normal * incidentDirection) * (normal * incidentDirection));
 
             if (fabsf(sinTheta) > 1.0) {
-                return {intersectedObject.emission.r + reflectedColor.r, intersectedObject.emission.g + reflectedColor.g,
-                        intersectedObject.emission.b + reflectedColor.b};
+                return intersectedObject.emission + reflectedColor;
             }
 
             float reflectivityCoefficient = pow((eta1 - eta2) / (eta1 + eta2), 2.0);
             float reflectivity = reflectivityCoefficient + (1.0 - reflectivityCoefficient) * pow(1.0 - (normal * incidentDirection), 5.0);
 
             if (u01(rnd) < reflectivity) {
-                return {intersectedObject.emission.r + reflectedColor.r, intersectedObject.emission.g + reflectedColor.g,
-                        intersectedObject.emission.b + reflectedColor.b};
+                return intersectedObject.emission + reflectedColor;
             }
 
             float cosTheta = sqrt(1.0 - sinTheta * sinTheta);
@@ -221,27 +221,24 @@ Color Scene::getPixelColor(std::uniform_real_distribution<float> u01, std::norma
                 reflectedColor = reflectedColor * intersectedObject.color;
             }
 
-            return {intersectedObject.emission.r + reflectedColor.r, intersectedObject.emission.g + reflectedColor.g,
-                    intersectedObject.emission.b + reflectedColor.b};
+            return intersectedObject.emission + reflectedColor;
         }
 
         auto rec_color = intersectedObject.color * reflectedColor;
-        return {intersectedObject.emission.r + rec_color.r, intersectedObject.emission.g + rec_color.g,
-                intersectedObject.emission.b + rec_color.b};
+        return intersectedObject.emission + rec_color;
     } else {
         Point p = ray.o + point * ray.d;
 
-        Point w = distribution->sample(u01, n01, rng, p + 0.0001 * normal, normal);
+        Point w = distribution.sample(u01, n01, rng, p + 0.0001 * normal, normal);
         if (w * normal < 0) {
             return intersectedObject.emission;
         }
 
-        float pdf = distribution->pdf(p + 0.0001 * normal, normal, w);
+        float pdf = distribution.pdf(p + 0.0001 * normal, normal, w);
         Ray wR = Ray(p + 0.0001 * w, w);
 
         auto rec_color = 1.0 / (acos(-1) * pdf) * (w * normal) * intersectedObject.color * getPixelColor(u01, n01, rng, wR, bounceNum - 1);
-        return {intersectedObject.emission.r + rec_color.r, intersectedObject.emission.g + rec_color.g,
-                intersectedObject.emission.b + rec_color.b};
+        return intersectedObject.emission + rec_color;
     }
 }
 
@@ -250,59 +247,51 @@ void Scene::render(std::ostream &out) const {
     out << width << " " << height << '\n';
     out << 255 << '\n';
 
-    int fast_num = std::thread::hardware_concurrency();
+    std::uniform_real_distribution<float> u01(0.0, 1.0);
+    std::normal_distribution<float> n01(0.0, 1.0);
 
-    int num_threads = std::min(samples, fast_num);
-    int chunk_size = samples / num_threads;
+    std::array<char, 3> ans[height][width];
+
+#pragma omp parallel for schedule(dynamic,8)
+    for (int iter = 0; iter < width * height; iter++) {
+        int y = iter / width;
+        int x = iter % width;
+
+        rng_type rng(iter);
+
+        Color pixel{0, 0, 0};
+
+        for (int i = 0; i < samples; i++) {
+            float nx = x + u01(rnd);
+            float ny = y + u01(rnd);
+
+            float tan_x = std::tan(cameraFovX / 2);
+            float tan_y = tan_x * float(height) / float(width);
+
+            float cx = 2.0 * nx / width - 1.0;
+            float cy = 2.0 * ny / height - 1.0;
+
+            float real_x = tan_x * cx;
+            float real_y = tan_y * cy;
+
+            Ray real_ray = Ray(camPos, real_x * camRight - real_y * camUp + camForward);
+
+            auto from_figures = getPixelColor(u01, n01, rng, real_ray, rayDepth);
+
+            pixel = pixel + from_figures;
+        }
+
+        pixel = (1.0 / samples) * pixel;
+
+        pixel = gamma(aces(pixel));
+
+        ans[y][x] = {char(std::round(255 * pixel.r)), char(std::round(255 * pixel.g)),
+                               char(std::round(255 * pixel.b))};
+    }
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            rng_type rng(y * width + x);
-            std::uniform_real_distribution<float> u01(0.0, 1.0);
-            std::normal_distribution<float> n01(0.0, 1.0);
-
-            Color pixel {0, 0, 0};
-
-            std::vector <std::thread> threads;
-            std::mutex mutex;
-            for (int i = 0; i < samples; i+=chunk_size) {
-                threads.emplace_back([&, i]{
-                    Color in_pixel;
-
-                    for (int j = i; j < std::min(i + chunk_size, samples); j++) {
-                        float nx = x + u01(rnd);
-                        float ny = y + u01(rnd);
-
-                        float tan_x = std::tan(cameraFovX / 2);
-                        float tan_y = tan_x * float(height) / float(width);
-
-                        float cx = 2.0 * nx / width - 1.0;
-                        float cy = 2.0 * ny / height - 1.0;
-
-                        float real_x = tan_x * cx;
-                        float real_y = tan_y * cy;
-
-                        Ray real_ray = Ray(camPos, real_x * camRight - real_y * camUp + camForward);
-
-                        auto from_figures = getPixelColor(u01, n01, rng, real_ray, rayDepth);
-
-                        in_pixel = Color(in_pixel.r + from_figures.r, in_pixel.g + from_figures.g, in_pixel.b + from_figures.b);
-                    }
-
-                    mutex.lock();
-                    pixel = Color(pixel.r + in_pixel.r, pixel.g + in_pixel.g, pixel.b + in_pixel.b);
-                    mutex.unlock();
-                });
-            }
-            for (auto& el : threads)
-                el.join();
-
-            pixel = (1.0 / samples) * pixel;
-
-            pixel = gamma(aces(pixel));
-
-            char res_pixel[3] = {char(std::round(255 * pixel.r)), char(std::round(255 * pixel.g)), char(std::round(255 * pixel.b))};
-            out.write((char *) res_pixel, 3);
+            out.write((char *) ans[y][x].data(), 3);
         }
     }
 }

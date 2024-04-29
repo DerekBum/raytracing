@@ -16,10 +16,24 @@ public:
     Ray() = default;
     Ray(Point o, Point d);
 
-    Ray operator +(const Point &other) const;
-    Ray operator -(const Point &other) const;
-    Ray rotate(const Rotation &rotation) const;
+    Ray operator +(const Point &r) const;
+    Ray operator -(const Point &r) const;
+    Ray rotate(const Rotation &r) const;
 };
+
+inline Ray::Ray(Point o, Point d): o(o), d(d) {}
+
+inline Ray Ray::operator+ (const Point &r) const {
+    return {o + r, d};
+}
+
+inline Ray Ray::operator- (const Point &r) const {
+    return {o - r, d};
+}
+
+inline Ray Ray::rotate(const Rotation &r) const {
+    return {r.transform(o), r.transform(d)};
+}
 
 struct Intersection {
     float t;

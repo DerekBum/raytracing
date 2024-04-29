@@ -1,20 +1,6 @@
 #include "figure.h"
 #include <cmath>
 
-Ray::Ray(Point o, Point d): o(o), d(d) {}
-
-Ray Ray::operator+ (const Point &p) const {
-    return {o + p, d};
-}
-
-Ray Ray::operator- (const Point &p) const {
-    return {o - p, d};
-}
-
-Ray Ray::rotate(const Rotation &r) const {
-    return {r.transform(o), r.transform(d)};
-}
-
 Figure::Figure() = default;
 
 Figure::Figure(FigureType type, Point data): type(type), data(data) {};
