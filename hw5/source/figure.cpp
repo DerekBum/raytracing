@@ -1,11 +1,14 @@
 #include "figure.h"
 #include <cmath>
+#include <cassert>
 
-Figure::Figure() = default;
+Figure::Figure() {};
 
 Figure::Figure(FigureType type, Point data): type(type), data(data) {};
 
 Figure::Figure(FigureType type, Point data, Point data2, Point data3): type(type), data(data), data2(data2), data3(data3) {};
+
+static const float T_MAX = 1e4;
 
 std::optional<Intersection> Figure::intersect(const Ray &ray) const {
     Ray transformed = (ray - position).rotate(rotation);
@@ -52,11 +55,9 @@ std::optional<std::pair<float, bool>> smallestPositiveRootOfQuadraticEquation(fl
 
 std::optional<Intersection> Figure::intersectAsEllipsoid(const Ray &ray) const {
     Point r = data;
-    auto ro = Point(ray.o.x / r.x, ray.o.y / r.y, ray.o.z / r.z);
-    auto rd = Point(ray.d.x / r.x, ray.d.y / r.y, ray.d.z / r.z);
-    float c = ro.len_square() - 1;
-    float b = 2.0 * ro * rd;
-    float a = rd.len_square();
+    float c = (ray.o / r).len_square() - 1;
+    float b = 2. * (ray.o / r).dot(ray.d / r);
+    float a = (ray.d / r).len_square();
 
     auto opt_t = smallestPositiveRootOfQuadraticEquation(a, b, c);
     if (!opt_t.has_value()) {
@@ -65,18 +66,19 @@ std::optional<Intersection> Figure::intersectAsEllipsoid(const Ray &ray) const {
 
     auto [t, is_inside] = opt_t.value();
     Point point = ray.o + t * ray.d;
-    Point norma = (1.0 / (r * r)) * point;
+    Point norma = point / (r * r);
     if (is_inside) {
         norma = -1. * norma;
     }
+    assert(true);
     return {Intersection {t, norma.normalize(), is_inside}};
 }
 
 std::optional<Intersection> intersectPlaneAndRay(const Point &n, const Ray &ray) {
-    float t = -(ray.o * n) / (ray.d * n);
-    if (t > 0 && t < 1e4) {
-        if (ray.d * n > 0) {
-            return {Intersection {t, -1.0 * n, true}};
+    float t = -ray.o.dot(n) / ray.d.dot(n);
+    if (t > 0 && t < T_MAX) {
+        if (ray.d.dot(n) > 0) {
+            return {Intersection {t, -1. * n, true}};
         }
         return {Intersection {t, n, false}};
     }
@@ -87,24 +89,14 @@ std::optional<Intersection> Figure::intersectAsPlane(const Ray &ray) const {
     return intersectPlaneAndRay(data, ray);
 }
 
-std::optional<Intersection> intersectBoxAndRay(const Point& s, const Ray& ray, bool require_normal = true) {
-    auto calculateInterval = [&](float start, float end, float dir) {
-        float t1 = (start) / dir;
-        float t2 = (end) / dir;
-        if (t1 > t2)
-            std::swap(t1, t2);
-        return std::make_pair(t1, t2);
-    };
-
-    auto mi = (-1.0 * s - ray.o);
-    auto ma = (s - ray.o);
-    auto tsX = calculateInterval(mi.x, ma.x, ray.d.x);
-    auto tsY = calculateInterval(mi.y, ma.y, ray.d.y);
-    auto tsZ = calculateInterval(mi.z, ma.z, ray.d.z);
-
-    float t1 = std::max(tsX.first, std::max(tsY.first, tsZ.first));
-    float t2 = std::min(tsX.second, std::min(tsY.second, tsZ.second));
-
+std::optional<Intersection> intersectBoxAndRay(const Point &s, const Ray &ray, bool require_norma = true) {
+    Point ts1 = (-1. * s - ray.o) / ray.d;
+    Point ts2 = (s - ray.o) / ray.d;
+    float t1x = std::min(ts1.x, ts2.x), t2x = std::max(ts1.x, ts2.x);
+    float t1y = std::min(ts1.y, ts2.y), t2y = std::max(ts1.y, ts2.y);
+    float t1z = std::min(ts1.z, ts2.z), t2z = std::max(ts1.z, ts2.z);
+    float t1 = std::max(std::max(t1x, t1y), t1z);
+    float t2 = std::min(std::min(t2x, t2y), t2z);
     if (t1 > t2 || t2 < 0) {
         return {};
     }
@@ -119,25 +111,29 @@ std::optional<Intersection> intersectBoxAndRay(const Point& s, const Ray& ray, b
         t = t1;
     }
 
-    if (!require_normal) {
+    if (!require_norma) {
         return {Intersection {t, {}, is_inside}};
     }
 
     Point p = ray.o + t * ray.d;
-    Point normal = Point(p.x / s.x, p.y / s.y, p.z / s.z);
-    float maxComponent = std::max(std::fabs(normal.x), std::max(std::fabs(normal.y), std::fabs(normal.z)));
-    if (std::fabs(normal.x) != maxComponent)
-        normal.x = 0;
-    if (std::fabs(normal.y) != maxComponent)
-        normal.y = 0;
-    if (std::fabs(normal.z) != maxComponent)
-        normal.z = 0;
+    Point norma = p / s;
+    float mx = std::max(std::max(fabs(norma.x), fabs(norma.y)), fabs(norma.z));
 
-    if (is_inside) {
-        normal = -1.0f * normal;
+    if (fabs(norma.x) != mx) {
+        norma.x = 0;
+    }
+    if (fabs(norma.y) != mx) {
+        norma.y = 0;
+    }
+    if (fabs(norma.z) != mx) {
+        norma.z = 0;
     }
 
-    return {Intersection {t, normal, is_inside}};
+    if (is_inside) {
+        norma = -1. * norma;
+    }
+
+    return {Intersection {t, norma, is_inside}};
 }
 
 std::optional<Intersection> Figure::intersectAsBox(const Ray &ray) const {
@@ -155,13 +151,13 @@ std::optional<Intersection> Figure::intersectAsTriangle(const Ray &ray) const {
     }
     auto t = intersection.value().t;
     Point p = ray.o - a + t * ray.d;
-    if (b.inter(p) * n < 0) {
+    if (b.inter(p).dot(n) < 0) {
         return {};
     }
-    if (p.inter(c) * n < 0) {
+    if (p.inter(c).dot(n) < 0) {
         return {};
     }
-    if ((c - b).inter(p - b) * n < 0) {
+    if ((c - b).inter(p - b).dot(n) < 0) {
         return {};
     }
     return intersection;

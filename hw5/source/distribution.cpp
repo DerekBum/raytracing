@@ -2,14 +2,14 @@
 
 Point Uniform::sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const {
     Point d = Point {n01(rng), n01(rng), n01(rng)}.normalize();
-    if (d * n < 0) {
+    if (d.dot(n) < 0) {
         d = -1.0 * d;
     }
     return d;
 }
 
 float Uniform::pdf(Point x, Point n, Point d) const {
-    if (d * n < 0) {
+    if (d.dot(n) < 0) {
         return 0;
     }
     return 1.0 / (2.0 * PI);
@@ -19,19 +19,19 @@ Point Cosine::sample(std::normal_distribution<float> &n01, rng_type &rng, Point 
     Point d = Point {n01(rng), n01(rng), n01(rng)}.normalize();
     d = d + n;
     float len = sqrt(d.len_square());
-    if (len <= 1e-4 || d * n <= 1e-4 || std::isnan(len)) {
+    if (len <= 1e-4 || d.dot(n) <= 1e-4 || std::isnan(len)) {
         return n;
     }
     return 1.0 / len * d;
 }
 
 float Cosine::pdf(Point x, Point n, Point d) const {
-    return std::max(0.f, float(d * n / PI));
+    return std::max(0.f, float(d.dot(n) / PI));
 }
 
 
 float BoxLight::pdfOne(Point x, Point d, Point y, Point yn) const {
-    return (x - y).len_square() / (sTotal * fabs(d * yn));
+    return (x - y).len_square() / (sTotal * fabs(d.dot(yn)));
 }
 
 Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const {
@@ -58,7 +58,7 @@ Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng
 
 
 float TriangleLight::pdfOne(Point x, Point d, Point y, Point yn) const {
-    return pointProb * (x - y).len_square() / fabs(d * yn);
+    return pointProb * (x - y).len_square() / fabs(d.dot(yn));
 }
 
 Point TriangleLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const {
@@ -81,7 +81,7 @@ float EllipsoidLight::pdfOne(Point x, Point d, Point y, Point yn) const {
     auto transf = figure.rotation.transform(y - figure.position);
     Point n = Point(transf.x / r.x, transf.y / r.y, transf.z / r.z);
     float pointProb = 1. / (4 * PI * sqrt(Point{n.x * r.y * r.z, r.x * n.y * r.z, r.x * r.y * n.z}.len_square()));
-    return pointProb * (x - y).len_square() / fabs(d * yn);
+    return pointProb * (x - y).len_square() / fabs(d.dot(yn));
 }
 
 Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const {
@@ -89,7 +89,7 @@ Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng
 
     for (int i = 0; i < 1000; i++) {
         auto norm = Point{n01(rng), n01(rng), n01(rng)}.normalize();
-        Point point = r ^ norm;
+        Point point = r * norm;
         Point actualPoint = figure.rotation.doth().transform(point) + figure.position;
         if (figure.intersect(Ray(x, (actualPoint - x).normalize())).has_value()) {
             return (actualPoint - x).normalize();

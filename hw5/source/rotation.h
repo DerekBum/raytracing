@@ -1,5 +1,4 @@
-#ifndef HW1_ROTATION_H
-#define HW1_ROTATION_H
+#pragma once
 
 #include "point.h"
 
@@ -36,11 +35,9 @@ inline Rotation Rotation::operator* (const Rotation &r) const {
     float n_y = v.x * r.v.z - v.z * r.v.x;
     float n_z = v.y * r.v.x - v.x * r.v.y;
 
-    return {w * r.v + r.w * v + Point(n_x, n_y, n_z), w * r.w - v * r.v};
+    return {w * r.v + r.w * v + Point(n_x, n_y, n_z), w * r.w - v.dot(r.v)};
 }
 
 inline Point Rotation::transform(const Point &p) const {
     return ((*this) * Rotation(p.x, p.y, p.z, 0.0) * Rotation(-1.0 * v, w)).v;
 }
-
-#endif //HW1_ROTATION_H

@@ -1,5 +1,4 @@
-#ifndef HW1_POINT_H
-#define HW1_POINT_H
+#pragma once
 
 #include <valarray>
 
@@ -13,13 +12,16 @@ public:
 
     Point operator+ (const Point &p) const;
     Point operator- (const Point &p) const;
-    float operator* (const Point &p) const;
-    Point operator^ (const Point &p) const;
+    Point operator* (const Point &p) const;
+    float dot(const Point &p) const;
     float len_square() const;
 
     Point normalize() const;
 
     Point inter(const Point &p) const;
+
+    Point operator+ (float k) const;
+    Point operator/ (const Point &p) const;
 };
 
 Point operator* (float k, const Point &p);
@@ -38,12 +40,16 @@ inline Point operator* (float k, const Point &p) {
     return {k * p.x, k * p.y, k * p.z};
 }
 
-inline float Point::operator* (const Point &p) const {
+inline float Point::dot(const Point &p) const {
     return x * p.x + y * p.y + z * p.z;
 }
 
+inline Point Point::operator* (const Point &p) const {
+    return {x * p.x, y * p.y, z * p.z};
+}
+
 inline float Point::len_square() const {
-    return (*this) * (*this);
+    return this->dot(*this);
 }
 
 inline Point Point::normalize() const {
@@ -54,8 +60,10 @@ inline Point Point::inter(const Point &p) const {
     return {z * p.y - y * p.z, x * p.z - z * p.x, y * p.x - x * p.y};
 }
 
-inline Point Point::operator^ (const Point &p) const {
-    return {x * p.x, y * p.y, z * p.z};
+inline Point Point::operator+ (float k) const {
+    return {k + x, k + y, k + z};
 }
 
-#endif //HW1_POINT_H
+inline Point Point::operator/ (const Point &p) const {
+    return {x / p.x, y / p.y, z / p.z};
+}

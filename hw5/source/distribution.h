@@ -85,7 +85,7 @@ public:
 
     FiguresMix(std::vector<Figure> figures) {
         size_t n = std::partition(figures.begin(), figures.end(), [](const auto &fig) {
-            if (fig.emission.r == 0 && fig.emission.g == 0 && fig.emission.b == 0) {
+            if (fig.emission.x == 0 && fig.emission.y == 0 && fig.emission.z == 0) {
                 return false;
             }
             return fig.type == FigureType::BOX || fig.type == FigureType::ELLIPSOID || fig.type == FigureType::TRIANGLE;

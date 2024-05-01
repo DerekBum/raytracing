@@ -1,5 +1,4 @@
-#ifndef HW1_SCENE_H
-#define HW1_SCENE_H
+#pragma once
 
 #include <iostream>
 #include <memory>
@@ -25,16 +24,14 @@ public:
     Scene() = default;
 
     void render(std::ostream &out) const;
-    Color getPixelColor(std::uniform_real_distribution<float> u01, std::normal_distribution<float> n01, rng_type &rng, Ray ray, int bounceNum) const;
+    Color getPixelColor(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng, const Ray &ray, int bounceNum) const;
 
     Mix distribution;
 
     BVH bvh;
     int bvhble;
 
-    std::optional<std::pair<Intersection, int>> findIntersection(Ray ray) const;
+    std::optional<std::pair<Intersection, int>> intersect(const Ray &ray) const;
 };
 
 Scene loadSceneFromFile(std::istream &in);
-
-#endif //HW1_SCENE_H
