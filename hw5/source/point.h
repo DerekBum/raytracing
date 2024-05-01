@@ -14,6 +14,7 @@ public:
     Point operator+ (const Point &p) const;
     Point operator- (const Point &p) const;
     float operator* (const Point &p) const;
+    Point operator^ (const Point &p) const;
     float len_square() const;
 
     Point normalize() const;
@@ -51,6 +52,10 @@ inline Point Point::normalize() const {
 
 inline Point Point::inter(const Point &p) const {
     return {z * p.y - y * p.z, x * p.z - z * p.x, y * p.x - x * p.y};
+}
+
+inline Point Point::operator^ (const Point &p) const {
+    return {x * p.x, y * p.y, z * p.z};
 }
 
 #endif //HW1_POINT_H

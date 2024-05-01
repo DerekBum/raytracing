@@ -15,6 +15,8 @@ public:
     Rotation operator+ (const Rotation &r) const;
     Rotation operator* (const Rotation &r) const;
     Point transform(const Point &p) const;
+
+    Rotation doth() const;
 };
 
 inline Rotation::Rotation(float x, float y, float z, float w): v(Point(x, y, z)), w(w) {}
@@ -23,6 +25,10 @@ inline Rotation::Rotation(Point v, float w): v(v), w(w) {}
 
 inline Rotation Rotation::operator+ (const Rotation &r) const {
     return {v + r.v, w + r.w};
+}
+
+inline Rotation Rotation::doth() const {
+    return {-1.0 * v, w};
 }
 
 inline Rotation Rotation::operator* (const Rotation &r) const {

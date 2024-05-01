@@ -25,8 +25,7 @@ std::optional<Intersection> Figure::intersect(const Ray &ray) const {
         return {};
     }
     auto [t, norma, is_inside] = result.value();
-    auto rot = Rotation(-1.0 * rotation.v, rotation.w);
-    norma = rot.transform(norma).normalize();
+    norma = rotation.doth().transform(norma).normalize();
     return {Intersection {t, norma, is_inside}};
 }
 
@@ -184,7 +183,7 @@ AABB::AABB(const Figure &fig) {
                 std::max(fig.data3.z, std::max(fig.data.z, fig.data2.z))
         );
     }
-    auto rotation = Rotation(-1.0 * fig.rotation.v, fig.rotation.w);
+    auto rotation = fig.rotation.doth();
     AABB unbiased = *this;
     min = max = rotation.transform(unbiased.min);
     extend(rotation.transform(Point(unbiased.min.x, unbiased.min.y, unbiased.max.z)));

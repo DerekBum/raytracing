@@ -125,8 +125,6 @@ Scene loadSceneFromFile(std::istream &in) {
                 ss >> scene.rayDepth;
             } else if (command == "SAMPLES") {
                 ss >> scene.samples;
-                if (scene.samples > 256)
-                    scene.samples /= 2;
             } else {
                 std::cerr << "Unknown command: " << command << std::endl;
             }
@@ -237,7 +235,7 @@ Color Scene::getPixelColor(std::uniform_real_distribution<float> u01, std::norma
         float pdf = distribution.pdf(p + 0.0001 * normal, normal, w);
         Ray wR = Ray(p + 0.0001 * w, w);
 
-        auto rec_color = 1.0 / (acos(-1) * pdf) * (w * normal) * intersectedObject.color * getPixelColor(u01, n01, rng, wR, bounceNum - 1);
+        auto rec_color = 1.0 / (PI * pdf) * (w * normal) * intersectedObject.color * getPixelColor(u01, n01, rng, wR, bounceNum - 1);
         return intersectedObject.emission + rec_color;
     }
 }

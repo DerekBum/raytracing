@@ -19,7 +19,7 @@ Point Cosine::sample(std::normal_distribution<float> &n01, rng_type &rng, Point 
     Point d = Point {n01(rng), n01(rng), n01(rng)}.normalize();
     d = d + n;
     float len = sqrt(d.len_square());
-    if (len <= 1e-9 || d * n <= 1e-9 || std::isnan(len)) {
+    if (len <= 1e-4 || d * n <= 1e-4 || std::isnan(len)) {
         return n;
     }
     return 1.0 / len * d;
@@ -48,8 +48,7 @@ Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng
             point = Point((2 * u01(rng) - 1) * sx, (2 * u01(rng) - 1) * sy, flipSign * sz);
         }
 
-        auto rot = Rotation(-1.0 * figure.rotation.v, figure.rotation.w);
-        Point actualPoint = rot.transform(point) + figure.position;
+        Point actualPoint = figure.rotation.doth().transform(point) + figure.position;
         if (figure.intersect(Ray(x, (actualPoint - x).normalize())).has_value()) {
             return (actualPoint - x).normalize();
         }
@@ -72,8 +71,7 @@ Point TriangleLight::sample(std::uniform_real_distribution<float> &u01, rng_type
         u = 1 - u;
         v = 1 - v;
     }
-    auto rot = Rotation(-1.0 * figure.rotation.v, figure.rotation.w);
-    Point point = figure.position + rot.transform(a + u * b + v * c);
+    Point point = figure.position + figure.rotation.doth().transform(a + u * b + v * c);
     return (point - x).normalize();
 }
 
@@ -91,9 +89,8 @@ Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng
 
     for (int i = 0; i < 1000; i++) {
         auto norm = Point{n01(rng), n01(rng), n01(rng)}.normalize();
-        Point point = Point(r.x * norm.x, r.y * norm.y, r.z * norm.z);
-        auto rot = Rotation(-1.0 * figure.rotation.v, figure.rotation.w);
-        Point actualPoint = rot.transform(point) + figure.position;
+        Point point = r ^ norm;
+        Point actualPoint = figure.rotation.doth().transform(point) + figure.position;
         if (figure.intersect(Ray(x, (actualPoint - x).normalize())).has_value()) {
             return (actualPoint - x).normalize();
         }
@@ -142,12 +139,12 @@ FiguresMix::pdfLight(const std::variant<BoxLight, EllipsoidLight, TriangleLight>
         return ans;
     }
 
-    auto secondIntersection = figure.intersect(Ray(x + (t + 1e-9) * d, d));
+    auto secondIntersection = figure.intersect(Ray(x + (t + 1e-4) * d, d));
     if (!secondIntersection.has_value()) {
         return ans;
     }
     auto [t2, yn2, __] = secondIntersection.value();
-    Point y2 = x + (t + 1e-9 + t2) * d;
+    Point y2 = x + (t + 1e-4 + t2) * d;
     return ans + std::visit([&](const auto& light) { return light.pdfOne(x, d, y2, yn2); }, figureLight);
 }
 
