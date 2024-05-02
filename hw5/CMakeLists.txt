@@ -8,15 +8,12 @@ add_executable(hw5 source/main.cpp
         source/scene.h
         source/color.cpp
         source/color.h
-        source/point.cpp
         source/point.h
         source/figure.cpp
         source/figure.h
-        source/rotation.cpp
         source/rotation.h
         source/distribution.cpp
         source/distribution.h
-        source/bvh.cpp
         source/bvh.h
 )
 find_package(OpenMP)

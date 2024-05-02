@@ -8,15 +8,15 @@
 #include "bvh.h"
 
 typedef std::minstd_rand rng_type;
-const float PI = acos(-1);
+const float PI = acos(-1.0);
 
 class Uniform {
 public:
     Uniform() = default;
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const;
 
-    float pdf(Point x, Point n, Point d) const;
+    float pdf(Point &x, Point &n, Point &d) const;
 };
 
 
@@ -24,9 +24,9 @@ class Cosine {
 public:
     Cosine() {}
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const;
 
-    float pdf(Point x, Point n, Point d) const;
+    float pdf(Point &x, Point &n, Point &d) const;
 };
 
 class BoxLight {
@@ -34,9 +34,9 @@ public:
     float sTotal, sx, sy, sz, wx, wy, wz;
     const Figure figure;
 
-    float pdfOne(Point x, Point d, Point y, Point yn) const;
+    float pdfOne(Point &x, Point &d, Point &y, Point &yn) const;
 
-    BoxLight(const Figure &box): figure(box) {
+    explicit BoxLight(const Figure &box): figure(box) {
         sx = box.data.x;
         sy = box.data.y;
         sz = box.data.z;
@@ -46,7 +46,7 @@ public:
         wz = sx * sy;
     }
 
-    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const;
+    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point &x, Point &n) const;
 };
 
 class TriangleLight {
@@ -54,9 +54,9 @@ public:
     float pointProb;
     const Figure figure;
 
-    float pdfOne(Point x, Point d, Point y, Point yn) const;
+    float pdfOne(Point &x, Point &d, Point &y, Point &yn) const;
 
-    TriangleLight(const Figure &ellipsoid): figure(ellipsoid) {
+    explicit TriangleLight(const Figure &ellipsoid): figure(ellipsoid) {
         const Point &a = figure.data3;
         const Point &b = figure.data - a;
         const Point &c = figure.data2 - a;
@@ -64,18 +64,18 @@ public:
         pointProb = 1.0 / (0.5 * sqrt(n.len_square()));
     }
 
-    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const;
+    Point sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point &x, Point &n) const;
 };
 
 class EllipsoidLight {
 public:
     const Figure figure;
 
-    float pdfOne(Point x, Point d, Point y, Point yn) const;
+    float pdfOne(Point &x, Point &d, Point &y, Point &yn) const;
 
-    EllipsoidLight(const Figure &ellipsoid): figure(ellipsoid) {}
+    explicit EllipsoidLight(const Figure &ellipsoid): figure(ellipsoid) {}
 
-    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const;
+    Point sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const;
 };
 
 class FiguresMix {
@@ -83,7 +83,7 @@ public:
     std::vector<std::variant<BoxLight, EllipsoidLight, TriangleLight>> figures_;
     BVH bvh;
 
-    FiguresMix(std::vector<Figure> figures) {
+    explicit FiguresMix(std::vector<Figure> figures) {
         size_t n = std::partition(figures.begin(), figures.end(), [](const auto &fig) {
             if (fig.emission.x == 0 && fig.emission.y == 0 && fig.emission.z == 0) {
                 return false;
@@ -104,27 +104,27 @@ public:
     }
 
     Point sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng,
-                 Point x, Point n) const;
+                 Point &x, Point &n) const;
 
-    float pdf(Point x, Point n, Point d) const;
+    float pdf(Point &x, Point &n, Point &d) const;
 
     bool isEmpty() const;
 
     float pdfLight(const std::variant<BoxLight, EllipsoidLight, TriangleLight> &figureLight,
-                            Point x, Point n, Point d) const;
+                            Point &x, Point &n, Point &d) const;
 
-    float getTotalPdf(uint32_t pos, const Point &x, const Point &n, const Point &d) const;
+    float getTotalPdf(uint32_t pos, Point &x, Point &n, Point &d) const;
 };
 
 class Mix {
 public:
     std::vector<std::variant<Cosine, FiguresMix>> components;
 
-    Mix() {}
-    Mix(const std::vector<std::variant<Cosine, FiguresMix>> &components): components(components) {}
+    Mix() = default;
+    explicit Mix(const std::vector<std::variant<Cosine, FiguresMix>> &components): components(components) {}
 
     Point sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng,
-                 Point x, Point n) const;
+                 Point &x, Point &n) const;
 
-    float pdf(Point x, Point n, Point d) const;
+    float pdf(Point &x, Point &n, Point &d) const;
 };

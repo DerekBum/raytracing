@@ -148,8 +148,6 @@ Scene loadSceneFromFile(std::istream &in) {
     return scene;
 }
 
-float eps = 0.0001;
-
 std::optional<std::pair<Intersection, int>> Scene::intersect(const Ray &ray) const {
     std::optional<std::pair<Intersection, int>> bestIntersection = {};
     for (int i = bvhble; i < (int) figures.size(); i++) {
@@ -186,15 +184,15 @@ Color Scene::getPixelColor(std::uniform_real_distribution<float> &u01, std::norm
     auto normal = intersection.norma;
     auto point = intersection.t;
     auto insideObject = intersection.is_inside;
-    auto intersectedObject = figures[intersectedObjectIndex];
+    auto intersectedObject = figures.begin() + intersectedObjectIndex;
 
-    if (intersectedObject.material == Material::METALLIC || intersectedObject.material == Material::DIELECTRIC) {
+    if (intersectedObject->material == Material::METALLIC || intersectedObject->material == Material::DIELECTRIC) {
         Point reflectionDirection = ray.d.normalize() - 2.0 * (normal * ray.d.normalize()) * normal;
-        Ray reflectionRay(ray.o + point * ray.d + 0.0001 * reflectionDirection, reflectionDirection);
+        Ray reflectionRay(ray.o + point * ray.d + eps * reflectionDirection, reflectionDirection);
         Color reflectedColor = getPixelColor(u01, n01, rng, reflectionRay, bounceNum - 1);
 
-        if (intersectedObject.material == Material::DIELECTRIC) {
-            float eta1 = 1.0, eta2 = intersectedObject.ior;
+        if (intersectedObject->material == Material::DIELECTRIC) {
+            float eta1 = 1.0, eta2 = intersectedObject->ior;
             if (insideObject)
                 std::swap(eta1, eta2);
 
@@ -202,44 +200,74 @@ Color Scene::getPixelColor(std::uniform_real_distribution<float> &u01, std::norm
             float sinTheta = eta1 / eta2 * sqrt(1.0 - normal.dot(incidentDirection) * normal.dot(incidentDirection));
 
             if (fabsf(sinTheta) > 1.0) {
-                return intersectedObject.emission + reflectedColor;
+                return intersectedObject->emission + reflectedColor;
             }
 
             float reflectivityCoefficient = pow((eta1 - eta2) / (eta1 + eta2), 2.0);
             float reflectivity = reflectivityCoefficient + (1.0 - reflectivityCoefficient) * pow(1.0 - normal.dot(incidentDirection), 5.0);
 
             if (u01(rnd) < reflectivity) {
-                return intersectedObject.emission + reflectedColor;
+                return intersectedObject->emission + reflectedColor;
             }
 
             float cosTheta = sqrt(1.0 - sinTheta * sinTheta);
             reflectionDirection = eta1 / eta2 * (-1.0 * incidentDirection) + (eta1 / eta2 * normal.dot(incidentDirection) - cosTheta) * normal;
-            auto reflection = Ray(ray.o + point * ray.d + 0.0001 * reflectionDirection, reflectionDirection);
+            auto reflection = Ray(ray.o + point * ray.d + eps * reflectionDirection, reflectionDirection);
             reflectedColor = getPixelColor(u01, n01, rng, reflection, bounceNum - 1);
 
             if (!insideObject) {
-                reflectedColor = reflectedColor * intersectedObject.color;
+                reflectedColor = reflectedColor * intersectedObject->color;
             }
 
-            return intersectedObject.emission + reflectedColor;
+            return intersectedObject->emission + reflectedColor;
         }
 
-        auto rec_color = intersectedObject.color * reflectedColor;
-        return intersectedObject.emission + rec_color;
+        auto rec_color = intersectedObject->color * reflectedColor;
+        return intersectedObject->emission + rec_color;
     } else {
         Point p = ray.o + point * ray.d;
+        auto x_pt = p + eps * normal;
 
-        Point w = distribution.sample(u01, n01, rng, p + 0.0001 * normal, normal);
+        Point w = distribution.sample(u01, n01, rng, x_pt, normal);
         if (w.dot(normal) < 0) {
-            return intersectedObject.emission;
+            return intersectedObject->emission;
         }
 
-        float pdf = distribution.pdf(p + 0.0001 * normal, normal, w);
-        Ray wR = Ray(p + 0.0001 * w, w);
+        float pdf = distribution.pdf(x_pt, normal, w);
+        Ray wR = Ray(p + eps * w, w);
 
-        auto rec_color = 1.0 / (PI * pdf) * w.dot(normal) * intersectedObject.color * getPixelColor(u01, n01, rng, wR, bounceNum - 1);
-        return intersectedObject.emission + rec_color;
+        auto rec_color = 1.0 / (PI * pdf) * w.dot(normal) * intersectedObject->color * getPixelColor(u01, n01, rng, wR, bounceNum - 1);
+        return intersectedObject->emission + rec_color;
     }
+}
+
+Ray Scene::getRay(float x, float y) const {
+    float tan_x = tan(cameraFovX / 2);
+    float tan_y = tan_x * height / width;
+
+    float cx = 2.0 * x / width - 1.0;
+    float cy = 2.0 * y / height - 1.0;
+
+    float real_x = tan_x * cx;
+    float real_y = tan_y * cy;
+
+    return {camPos, real_x * camRight - real_y * camUp + camForward};
+}
+
+Color Scene::getPixel(rng_type &rng, int x, int y) const {
+    std::uniform_real_distribution<float> u01(0.0, 1.0);
+    std::normal_distribution<float> n01(0.0, 1.0);
+
+    Color pixel{0, 0, 0};
+
+    for (int i = 0; i < samples; i++) {
+        float nx = x + u01(rnd);
+        float ny = y + u01(rnd);
+
+        pixel = pixel + getPixelColor(u01, n01, rng, getRay(nx, ny), rayDepth);
+    }
+
+    return (1.0 / samples) * pixel;
 }
 
 void Scene::render(std::ostream &out) const {
@@ -252,36 +280,14 @@ void Scene::render(std::ostream &out) const {
 
     std::array<char, 3> ans[height][width];
 
-#pragma omp parallel for schedule(dynamic,8)
+#pragma omp parallel for schedule(dynamic, 8)
     for (int iter = 0; iter < width * height; iter++) {
         int y = iter / width;
         int x = iter % width;
 
         rng_type rng(iter);
 
-        Color pixel{0, 0, 0};
-
-        for (int i = 0; i < samples; i++) {
-            float nx = x + u01(rnd);
-            float ny = y + u01(rnd);
-
-            float tan_x = tan(cameraFovX / 2);
-            float tan_y = tan_x * height / width;
-
-            float cx = 2.0 * nx / width - 1.0;
-            float cy = 2.0 * ny / height - 1.0;
-
-            float real_x = tan_x * cx;
-            float real_y = tan_y * cy;
-
-            Ray real_ray = Ray(camPos, real_x * camRight - real_y * camUp + camForward);
-
-            pixel = pixel + getPixelColor(u01, n01, rng, real_ray, rayDepth);
-        }
-
-        pixel = (1.0 / samples) * pixel;
-
-        pixel = gamma(aces(pixel));
+        auto pixel = gamma(aces(getPixel(rng, x, y)));
 
         ans[y][x] = {char(std::round(255 * pixel.x)), char(std::round(255 * pixel.y)),
                                char(std::round(255 * pixel.z))};

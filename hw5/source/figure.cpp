@@ -1,12 +1,5 @@
 #include "figure.h"
 #include <cmath>
-#include <cassert>
-
-Figure::Figure() {};
-
-Figure::Figure(FigureType type, Point data): type(type), data(data) {};
-
-Figure::Figure(FigureType type, Point data, Point data2, Point data3): type(type), data(data), data2(data2), data3(data3) {};
 
 static const float T_MAX = 1e4;
 
@@ -70,7 +63,6 @@ std::optional<Intersection> Figure::intersectAsEllipsoid(const Ray &ray) const {
     if (is_inside) {
         norma = -1. * norma;
     }
-    assert(true);
     return {Intersection {t, norma.normalize(), is_inside}};
 }
 

@@ -9,6 +9,8 @@ enum class Material {
     DIFFUSE, METALLIC, DIELECTRIC
 };
 
+const float eps = 0.0001;
+
 class Ray {
 public:
     const Point o{}, d{};
@@ -65,9 +67,9 @@ public:
     Point data2{};
     Point data3{};
 
-    Figure();
-    Figure(FigureType type, Point data);
-    Figure(FigureType type, Point data, Point data2, Point data3);
+    Figure() {}
+    Figure(FigureType type, Point data) : type(type), data(data) {}
+    Figure(FigureType type, Point data, Point data2, Point data3) : type(type), data(data), data2(data2), data3(data3) {}
 
     std::optional<Intersection> intersect(const Ray &ray) const;
 };

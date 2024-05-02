@@ -4,6 +4,7 @@
 using namespace std;
 
 int main(int argc, const char *argv[]) {
+    (void) argc;
     ifstream in(argv[1]);
     ofstream out(argv[2]);
 

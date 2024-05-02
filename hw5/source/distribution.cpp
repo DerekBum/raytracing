@@ -1,6 +1,8 @@
 #include "distribution.h"
 
-Point Uniform::sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const {
+Point Uniform::sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const {
+    (void) x;
+
     Point d = Point {n01(rng), n01(rng), n01(rng)}.normalize();
     if (d.dot(n) < 0) {
         d = -1.0 * d;
@@ -8,33 +10,40 @@ Point Uniform::sample(std::normal_distribution<float> &n01, rng_type &rng, Point
     return d;
 }
 
-float Uniform::pdf(Point x, Point n, Point d) const {
+float Uniform::pdf(Point &x, Point &n, Point &d) const {
+    (void) x;
+
     if (d.dot(n) < 0) {
         return 0;
     }
     return 1.0 / (2.0 * PI);
 }
 
-Point Cosine::sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const {
+Point Cosine::sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const {
+    (void) x;
     Point d = Point {n01(rng), n01(rng), n01(rng)}.normalize();
     d = d + n;
     float len = sqrt(d.len_square());
-    if (len <= 1e-4 || d.dot(n) <= 1e-4 || std::isnan(len)) {
+    if (len <= eps || d.dot(n) <= eps || std::isnan(len)) {
         return n;
     }
     return 1.0 / len * d;
 }
 
-float Cosine::pdf(Point x, Point n, Point d) const {
+float Cosine::pdf(Point &x, Point &n, Point &d) const {
+    (void) x;
+
     return std::max(0.f, float(d.dot(n) / PI));
 }
 
 
-float BoxLight::pdfOne(Point x, Point d, Point y, Point yn) const {
+float BoxLight::pdfOne(Point &x, Point &d, Point &y, Point &yn) const {
     return (x - y).len_square() / (sTotal * fabs(d.dot(yn)));
 }
 
-Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const {
+Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point &x, Point &n) const {
+    (void) n;
+
     for (int _ = 0; _ < 1000; _++) {
         float u = u01(rng) * (wx + wy + wz);
         float flipSign = u01(rng) > 0.5 ? 1 : -1;
@@ -57,11 +66,13 @@ Point BoxLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng
 }
 
 
-float TriangleLight::pdfOne(Point x, Point d, Point y, Point yn) const {
+float TriangleLight::pdfOne(Point &x, Point &d, Point &y, Point &yn) const {
     return pointProb * (x - y).len_square() / fabs(d.dot(yn));
 }
 
-Point TriangleLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point x, Point n) const {
+Point TriangleLight::sample(std::uniform_real_distribution<float> &u01, rng_type &rng, Point &x, Point &n) const {
+    (void) n;
+
     const Point &a = figure.data3;
     const Point &b = figure.data - a;
     const Point &c = figure.data2 - a;
@@ -76,7 +87,7 @@ Point TriangleLight::sample(std::uniform_real_distribution<float> &u01, rng_type
 }
 
 
-float EllipsoidLight::pdfOne(Point x, Point d, Point y, Point yn) const {
+float EllipsoidLight::pdfOne(Point &x, Point &d, Point &y, Point &yn) const {
     Point r = figure.data;
     auto transf = figure.rotation.transform(y - figure.position);
     Point n = Point(transf.x / r.x, transf.y / r.y, transf.z / r.z);
@@ -84,7 +95,9 @@ float EllipsoidLight::pdfOne(Point x, Point d, Point y, Point yn) const {
     return pointProb * (x - y).len_square() / fabs(d.dot(yn));
 }
 
-Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng, Point x, Point n) const {
+Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng, Point &x, Point &n) const {
+    (void) n;
+
     Point r = figure.data;
 
     for (int i = 0; i < 1000; i++) {
@@ -100,7 +113,7 @@ Point EllipsoidLight::sample(std::normal_distribution<float> &n01, rng_type &rng
 
 Point
 FiguresMix::sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng,
-                   Point x, Point n) const {
+                   Point &x, Point &n) const {
 
     int distNum = u01(rng) * figures_.size();
     if (std::holds_alternative<BoxLight>(figures_[distNum])) {
@@ -112,7 +125,7 @@ FiguresMix::sample(std::uniform_real_distribution<float> &u01, std::normal_distr
     }
 }
 
-float FiguresMix::pdf(Point x, Point n, Point d) const {
+float FiguresMix::pdf(Point &x, Point &n, Point &d) const {
     return getTotalPdf(0, x, n, d) / figures_.size();
 }
 
@@ -121,8 +134,9 @@ bool FiguresMix::isEmpty() const {
 }
 
 float
-FiguresMix::pdfLight(const std::variant<BoxLight, EllipsoidLight, TriangleLight> &figureLight, Point x, Point n,
-                              Point d) const {
+FiguresMix::pdfLight(const std::variant<BoxLight, EllipsoidLight, TriangleLight> &figureLight, Point &x, Point &n,
+                              Point &d) const {
+    (void) n;
 
     const Figure &figure = std::visit([](const auto& light) { return light.figure; }, figureLight);
 
@@ -139,16 +153,16 @@ FiguresMix::pdfLight(const std::variant<BoxLight, EllipsoidLight, TriangleLight>
         return ans;
     }
 
-    auto secondIntersection = figure.intersect(Ray(x + (t + 1e-4) * d, d));
+    auto secondIntersection = figure.intersect(Ray(x + (t + eps) * d, d));
     if (!secondIntersection.has_value()) {
         return ans;
     }
     auto [t2, yn2, __] = secondIntersection.value();
-    Point y2 = x + (t + 1e-4 + t2) * d;
+    Point y2 = x + (t + eps + t2) * d;
     return ans + std::visit([&](const auto& light) { return light.pdfOne(x, d, y2, yn2); }, figureLight);
 }
 
-float FiguresMix::getTotalPdf(uint32_t pos, const Point &x, const Point &n, const Point &d) const {
+float FiguresMix::getTotalPdf(uint32_t pos, Point &x, Point &n, Point &d) const {
     Ray ray(x, d);
     const Node &cur = bvh.nodes[pos];
     auto intersection = cur.aabb.intersect(ray);
@@ -168,8 +182,8 @@ float FiguresMix::getTotalPdf(uint32_t pos, const Point &x, const Point &n, cons
 }
 
 Point
-Mix::sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng, Point x,
-            Point n) const {
+Mix::sample(std::uniform_real_distribution<float> &u01, std::normal_distribution<float> &n01, rng_type &rng, Point &x,
+            Point &n) const {
 
     int distNum = u01(rng) * components.size();
     if (std::holds_alternative<Cosine>(components[distNum])) {
@@ -179,7 +193,7 @@ Mix::sample(std::uniform_real_distribution<float> &u01, std::normal_distribution
     }
 }
 
-float Mix::pdf(Point x, Point n, Point d) const {
+float Mix::pdf(Point &x, Point &n, Point &d) const {
     float ans = 0;
     for (const auto &component : components) {
         std::visit([&](auto&& comp) {
